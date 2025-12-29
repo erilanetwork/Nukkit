@@ -1288,7 +1288,7 @@ public class Server {
     }
 
     public String getName() {
-        return "Nukkit";
+        return "ENukkit";
     }
 
     public boolean isRunning() {

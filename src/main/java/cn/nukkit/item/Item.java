@@ -26,6 +26,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import lombok.Data;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.nio.ByteOrder;
@@ -42,7 +43,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
     public static Class[] list;
     protected Block block;
     protected MaterialType materialType;
-    protected final int id;
+    protected int id;
     protected int meta;
     protected boolean hasMeta = true;
     private byte[] tags = new byte[0];
@@ -76,12 +77,43 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         this.name = name;
     }
 
+    public Item(String id) {
+        copyFrom(Item.get(id, 0, 1));
+    }
+
+    public Item(String id, Integer meta) {
+        copyFrom(Item.get(id, meta, 1));
+    }
+
+    public Item(String id, Integer meta, int count) {
+        copyFrom(Item.get(id, meta, count));
+    }
+
+    public Item(String id, Integer meta, int count, String name) {
+        Item item = Item.get(id, meta, count);
+        item.name = name;
+        copyFrom(item);
+    }
+
     public boolean hasMeta() {
         return hasMeta;
     }
 
     public boolean canBeActivated() {
         return false;
+    }
+
+    private void copyFrom(Item other) {
+        this.block = other.block;
+        this.materialType = other.materialType;
+        this.id = other.id;
+        this.meta = other.meta;
+        this.hasMeta = other.hasMeta;
+        this.tags = other.tags;
+        this.cachedNBT = other.cachedNBT;
+        this.count = other.count;
+        this.name = other.name;
+        this.persistentContainer = other.persistentContainer;
     }
 
     public static void init() {
@@ -539,6 +571,25 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             legacyId = 255 - legacyId;
         }
         return get(legacyId, meta, count);
+    }
+
+    public static Item get(@NotNull String id) {
+        return fromString(id);
+    }
+
+    public static Item get(@NotNull String id, Integer meta){
+        Item item = fromString(id);
+        item.setDamage(meta);
+
+        return item;
+    }
+
+    public static Item get(@NotNull String id, Integer meta, Integer count){
+        Item item = fromString(id);
+        item.setDamage(meta);
+        item.setCount(count);
+
+        return item;
     }
 
     public static Item get(int id) {

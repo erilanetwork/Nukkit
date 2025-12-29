@@ -200,6 +200,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected int inAirTicks;
     protected int startAirTicks = 5;
 
+    @Getter
     protected AdventureSettings adventureSettings;
     protected Color locatorBarColor;
 
@@ -245,6 +246,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     protected boolean enableClientCommand = true;
 
+    @Getter
     private BlockEnderChest viewingEnderChest;
 
     private LoginChainData loginChainData;
@@ -267,6 +269,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected int startAction = -1;
     private int lastEmote;
     protected int lastEnderPearl = 20;
+    @Getter
     protected int lastChorusFruitTeleport = 20;
     protected int lastFireworkBoost = 20;
     public long lastSkinChange = -1;
@@ -355,14 +358,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     /**
-     * Get last chorus fruit teleport tick
-     * @return last chorus fruit teleport tick
-     */
-    public int getLastChorusFruitTeleport() {
-        return lastChorusFruitTeleport;
-    }
-
-    /**
      * Set last chorus fruit teleport tick to current tick
      */
     public void onChorusFruitTeleport() {
@@ -391,14 +386,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      */
     public void onSpinAttack(int riptideLevel) {
         this.riptideTicks = 50 + (riptideLevel << 5);
-    }
-
-    /**
-     * Get ender chest the player is viewing
-     * @return the ender chest player is viewing or null if player is not viewing an ender chest
-     */
-    public BlockEnderChest getViewingEnderChest() {
-        return viewingEnderChest;
     }
 
     /**
@@ -483,14 +470,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     @Override
     public boolean hasPlayedBefore() {
         return this.playedBefore;
-    }
-
-    /**
-     * Get current adventure settings
-     * @return adventure settings
-     */
-    public AdventureSettings getAdventureSettings() {
-        return adventureSettings;
     }
 
     /**
@@ -7356,5 +7335,40 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public void closeFormWindows() {
         this.formWindows.clear();
         this.dataPacket(new ClientboundCloseFormPacket());
+    }
+
+    public String getXUID() {
+        return this.loginChainData.getXUID();
+    }
+
+    /**
+     * Set player flight status
+     * @param value allow flight enabled
+     */
+    public void setFlying(boolean value) {
+        boolean isFlying = this.isFlying();
+
+        if (value != isFlying){
+            this.resetFallDistance();
+
+            this.getAdventureSettings().set(Type.FLYING, value);
+            this.getAdventureSettings().update();
+        }
+    }
+
+    /**
+     * Check whether player is flying
+     * @return player flying
+     */
+    public boolean isFlying() {
+        return this.adventureSettings.get(Type.FLYING);
+    }
+
+    /**
+     * Retrieves player language code
+     * @return player language code
+     */
+    public String getLanguage() {
+        return this.loginChainData.getLanguageCode();
     }
 }
