@@ -71,6 +71,7 @@ public class SimpleCommandMap implements CommandMap {
         this.register("nukkit", new SeedCommand("seed"));
         this.register("nukkit", new PlaySoundCommand("playsound"));
         this.register("nukkit", new GarbageCollectorCommand("gc"));
+        this.register("nukkit", new WorldGenerateCommand("worldgenerate"));
     }
 
     @Override
