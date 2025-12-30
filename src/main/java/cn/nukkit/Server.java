@@ -537,8 +537,6 @@ public class Server {
         this.pluginManager.loadPlugins(this.pluginPath);
         this.enablePlugins(PluginLoadOrder.STARTUP);
 
-        Item.initCreativeItems();
-
         craftingManager.rebuildPacket();
 
         LevelProviderManager.addProvider(this, Anvil.class);
@@ -621,6 +619,7 @@ public class Server {
 
         CustomItemManager.get().closeRegistry();
         EntityManager.get().closeRegistry();
+        Item.initCreativeItems();
 
         if (Nukkit.DEBUG < 2) {
             this.watchdog = new Watchdog(this, 60000);
