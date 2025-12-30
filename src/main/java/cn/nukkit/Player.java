@@ -2593,7 +2593,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected void processLogin() {
         String lowerName = this.iusername;
         if (!this.server.isWhitelisted(lowerName)) {
-            this.kick(PlayerKickEvent.Reason.NOT_WHITELISTED, "§c§l»§r§c Sunucularımız, ErilaNetwork V2 güncellemesi sebebi ile bakımdadır. Daha fazla bilgi için;\n\n§c§l»§r§c DISCORD:§4 https://discord.gg/evPxn5r2Jd\n§c§l»§r§c INSTAGRAM:§4 @erilanetwork", false);
+            this.kick(PlayerKickEvent.Reason.NOT_WHITELISTED, "§f§l»§r§a BEKLENEN AN GELDİ!\nSkyBlock sunucumuz yarın açılıyor. Açılışımıza tüm oyuncularımızı bekliyoruz.\n§fDaha fazla bilgi için;\n§c§l»§r§c DISCORD:§4 https://discord.gg/evPxn5r2Jd\n§c§l»§r§c INSTAGRAM:§4 @erilanetwork", false);
             return;
         } else if (this.isBanned()) {
             String reason = this.server.getNameBans().getEntires().get(lowerName).getReason();
