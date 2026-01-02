@@ -92,17 +92,21 @@ public class BlockSugarcane extends BlockFlowable {
     @Override
     public int onUpdate(int type) {
         Block down = this.down();
+
+        boolean isRoot = (down.getId() != SUGARCANE_BLOCK);
+
         if (type == Level.BLOCK_UPDATE_NORMAL) {
-            if (down.isTransparent() && down.getId() != SUGARCANE_BLOCK) {
-                BlockPhysicsBreakEvent event = new BlockPhysicsBreakEvent(this, type);
+            if (down.isTransparent() && isRoot) {
+                BlockPhysicsBreakEvent event = new BlockPhysicsBreakEvent(this, type, isRoot);
                 Server.getInstance().getPluginManager().callEvent(event);
+
                 if (!event.isCancelled()) {
                     this.getLevel().useBreakOn(this);
                 }
                 return Level.BLOCK_UPDATE_NORMAL;
             }
         } else if (type == Level.BLOCK_UPDATE_RANDOM) {
-            if (down.getId() != SUGARCANE_BLOCK) {
+            if (isRoot) {
                 if (this.getDamage() == 0x0F) {
                     for (int y = 1; y < 3; ++y) {
                         Block b = this.getLevel().getBlock((int) this.x, (int) this.y + y, (int) this.z);
@@ -120,7 +124,7 @@ public class BlockSugarcane extends BlockFlowable {
                 } else {
                     this.setDamage(this.getDamage() + 1);
                 }
-                this.level.setBlock((int) this.x, (int) this.y, (int) this.z, BlockLayer.NORMAL, this, false, true, false); // No need to send this to client
+                this.level.setBlock((int) this.x, (int) this.y, (int) this.z, BlockLayer.NORMAL, this, false, true, false);
                 return Level.BLOCK_UPDATE_RANDOM;
             }
         }

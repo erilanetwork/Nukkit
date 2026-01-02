@@ -86,6 +86,7 @@ public class BlockCactus extends BlockTransparentMeta {
     @Override
     public int onUpdate(int type) {
         Block down = this.down();
+        boolean isRoot = (down.getId() != CACTUS);
         if (type == Level.BLOCK_UPDATE_NORMAL) {
             boolean invalidDown = down.getId() != SAND && down.getId() != CACTUS;
             boolean invalidSide = false;
@@ -96,7 +97,7 @@ public class BlockCactus extends BlockTransparentMeta {
                 }
             }
             if (invalidDown || invalidSide) {
-                BlockPhysicsBreakEvent event = new BlockPhysicsBreakEvent(this, type);
+                BlockPhysicsBreakEvent event = new BlockPhysicsBreakEvent(this, type, isRoot);
                 Server.getInstance().getPluginManager().callEvent(event);
                 if (!event.isCancelled()) {
                     this.getLevel().useBreakOn(this);
@@ -104,7 +105,7 @@ public class BlockCactus extends BlockTransparentMeta {
                 return Level.BLOCK_UPDATE_NORMAL;
             }
         } else if (type == Level.BLOCK_UPDATE_RANDOM) {
-            if (down.getId() != CACTUS) {
+            if (isRoot || down.getId() == CACTUS) {
                 if (this.getDamage() == 0x0F) {
                     FullChunk chunk = this.level.getChunk((int) x >> 4, (int) z >> 4);
                     for (int y = 1; y < 3; ++y) {
@@ -122,7 +123,7 @@ public class BlockCactus extends BlockTransparentMeta {
                 } else {
                     this.setDamage(this.getDamage() + 1);
                 }
-                this.level.setBlock((int) this.x, (int) this.y, (int) this.z, BlockLayer.NORMAL, this, false, true, false); // No need to send this to client
+                this.level.setBlock((int) this.x, (int) this.y, (int) this.z, BlockLayer.NORMAL, this, false, true, false);
             }
         }
 

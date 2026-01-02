@@ -195,7 +195,7 @@ public class BlockRedstoneWire extends BlockFlowable {
         }
 
         if (type == Level.BLOCK_UPDATE_NORMAL && !canStayOnFullSolid(this.down())) {
-            BlockPhysicsBreakEvent event = new BlockPhysicsBreakEvent(this, type);
+            BlockPhysicsBreakEvent event = new BlockPhysicsBreakEvent(this, type, false);
             Server.getInstance().getPluginManager().callEvent(event);
             if (!event.isCancelled()) {
                 this.getLevel().useBreakOn(this);
