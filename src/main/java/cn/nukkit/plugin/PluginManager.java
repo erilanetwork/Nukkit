@@ -73,6 +73,26 @@ public class PluginManager {
         return false;
     }
 
+    public void loadInternalPlugin() {
+        PluginLoader pluginLoader = fileAssociations.get(JavaPluginLoader.class.getName());
+        InternalPlugin plugin = InternalPlugin.INSTANCE;
+        Map<String, Object> info = new HashMap<>();
+        info.put("name", server.getName());
+        info.put("version", "1.0.0");
+        info.put("api", server.getNukkitVersion());
+        info.put("main", InternalPlugin.class.getName());
+        File file;
+        try {
+            file = new File(Server.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+        } catch (Exception e) {
+            file = new File(".");
+        }
+        PluginDescription description = new PluginDescription(info);
+        plugin.init(pluginLoader, server, description, new File(server.getName()), file);
+        plugins.put(description.getName(), plugin);
+        enablePlugin(plugin);
+    }
+
     public Map<String, Plugin> getPlugins() {
         return plugins;
     }

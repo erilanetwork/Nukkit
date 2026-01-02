@@ -1,5 +1,6 @@
 package cn.nukkit.plugin;
 
+import cn.nukkit.Server;
 import cn.nukkit.permission.Permission;
 import cn.nukkit.utils.PluginException;
 import org.yaml.snakeyaml.DumperOptions;
@@ -147,7 +148,7 @@ public class PluginDescription {
             this.api = list;
         }
 
-        if (this.main.startsWith("cn.nukkit.")) {
+        if (this.main.startsWith("cn.nukkit.") && !this.name.equals(Server.getInstance().getName())) {
             throw new PluginException(this.name + " has an invalid 'main' in plugin.yml (plugins can't be in cn.nukkit): " + this.main);
         }
 

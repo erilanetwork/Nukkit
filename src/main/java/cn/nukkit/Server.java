@@ -513,6 +513,8 @@ public class Server {
         this.pluginManager.subscribeToPermission(Server.BROADCAST_CHANNEL_ADMINISTRATIVE, this.consoleSender);
         this.pluginManager.registerInterface(JavaPluginLoader.class);
 
+        this.pluginManager.loadInternalPlugin();
+
         this.queryRegenerateEvent = new QueryRegenerateEvent(this, 5);
 
         log.info(this.baseLang.translateString("nukkit.server.networkStart", new String[]{this.getIp().isEmpty() ? "*" : this.getIp(), String.valueOf(this.getPort())}));

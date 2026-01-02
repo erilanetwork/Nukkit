@@ -2232,8 +2232,10 @@ public class Level implements ChunkManager, Metadatable, GeneratorTaskFactory {
             }
         }
 
+        PlayerInteractEvent ev = null;
+
         if (player != null) {
-            PlayerInteractEvent ev = new PlayerInteractEvent(player, item, target, face, Action.RIGHT_CLICK_BLOCK);
+            ev = new PlayerInteractEvent(player, item, target, face, Action.RIGHT_CLICK_BLOCK);
 
             if (player.getGamemode() > Player.ADVENTURE) {
                 ev.setCancelled(true);
@@ -2316,25 +2318,24 @@ public class Level implements ChunkManager, Metadatable, GeneratorTaskFactory {
         }
 
         if (!hand.canPassThrough() && hand.getBoundingBox() != null && !(hand instanceof BlockBed)) {
-            Entity[] entities = this.getCollidingEntities(hand.getBoundingBox());
-            for (Entity e : entities) {
-                if (player == e || e instanceof EntityProjectile || e instanceof EntityItem || (e instanceof Player && ((Player) e).isSpectator() || !e.canCollide())) {
+            for (Entity e : this.getCollidingEntities(hand.getBoundingBox())) {
+                if (player == e || e instanceof EntityProjectile || e instanceof EntityItem || (e instanceof Player && ((Player) e).isSpectator()) || !e.canCollide()) {
                     continue;
                 }
+                this.sendBlocks(player, new Block[]{block, target}, UpdateBlockPacket.FLAG_NONE);
+                return null;
+            }
+
+            if (player != null && hand.getBoundingBox().intersectsWith(player.getNextPositionBB())) {
                 this.sendBlocks(player, new Block[]{block, target}, UpdateBlockPacket.FLAG_NONE); // Prevent ghost blocks
                 return null; // Entity in block
             }
-
-            if (player != null) {
-                if (hand.getBoundingBox().intersectsWith(player.getNextPositionBB())) {
-                    this.sendBlocks(player, new Block[]{block, target}, UpdateBlockPacket.FLAG_NONE); // Prevent ghost blocks
-                    return null; // Player in block
-                }
-            }
         }
 
+        BlockPlaceEvent placeEvent = null;
+
         if (player != null) {
-            BlockPlaceEvent event = new BlockPlaceEvent(player, hand, block, target, item);
+            placeEvent = new BlockPlaceEvent(player, hand, block, target, item);
             if (player.getGamemode() == Player.ADVENTURE) {
                 Tag tag = item.getNamedTagEntry("CanPlaceOn");
                 boolean canPlace = false;
@@ -2351,16 +2352,15 @@ public class Level implements ChunkManager, Metadatable, GeneratorTaskFactory {
                     }
                 }
                 if (!canPlace) {
-                    event.setCancelled(true);
+                    placeEvent.setCancelled(true);
                 }
             }
 
             if (!player.isOp() && isInSpawnRadius(target)) {
-                event.setCancelled(true);
+                placeEvent.setCancelled(true);
             }
 
-            this.server.getPluginManager().callEvent(event);
-            if (event.isCancelled()) {
+            if (placeEvent.isCancelled()) {
                 return null;
             }
         }
@@ -2374,12 +2374,20 @@ public class Level implements ChunkManager, Metadatable, GeneratorTaskFactory {
             }
         }
 
-        if (!hand.place(item, block, target, face, fx, fy, fz, player)) {
-            if (liquidMoved) {
-                this.setBlock(block, Block.LAYER_NORMAL, block, false, false);
-                this.setBlock(block, Block.LAYER_WATERLOGGED, Block.get(BlockID.AIR), false, false);
+        boolean canPhysicallyPlace = hand.place(item, block, target, face, fx, fy, fz, player);
+
+        if (player != null) {
+            if (!canPhysicallyPlace) {
+                placeEvent.setCancelled(true);
+                ev.setCancelled(true);
             }
-            return null;
+
+            this.server.getPluginManager().callEvent(placeEvent);
+            this.server.getPluginManager().callEvent(ev);
+
+            if (placeEvent.isCancelled() || ev.isCancelled()) {
+                return null;
+            }
         }
 
         if (item.hasPersistentDataContainer() && item.getPersistentDataContainer().convertsToBlock()) {
@@ -2390,10 +2398,8 @@ public class Level implements ChunkManager, Metadatable, GeneratorTaskFactory {
             this.scheduleUpdate(block, 1);
         }
 
-        if (player != null) {
-            if (!player.isCreative()) {
-                item.setCount(item.getCount() - 1);
-            }
+        if (player != null && !player.isCreative()) {
+            item.setCount(item.getCount() - 1);
         }
 
         if (playSound) {
