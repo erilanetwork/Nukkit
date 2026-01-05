@@ -5,6 +5,7 @@ import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockFire;
 import cn.nukkit.block.BlockID;
+import cn.nukkit.block.BlockLavaStill;
 import cn.nukkit.entity.custom.CustomEntity;
 import cn.nukkit.entity.custom.EntityDefinition;
 import cn.nukkit.entity.custom.EntityManager;
@@ -2168,6 +2169,16 @@ public abstract class Entity extends Location implements Metadatable {
     public boolean isInsideOfFire() {
         for (Block block : this.getCollisionBlocks()) {
             if (block instanceof BlockFire) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public boolean isInsideOfLava() {
+        for (Block block : this.getCollisionBlocks()) {
+            if (block instanceof BlockLavaStill) {
                 return true;
             }
         }

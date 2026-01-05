@@ -3,6 +3,9 @@ package cn.nukkit.entity.item;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockID;
+import cn.nukkit.block.BlockLayer;
+import cn.nukkit.block.BlockLiquid;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
@@ -10,13 +13,15 @@ import cn.nukkit.event.entity.ItemDespawnEvent;
 import cn.nukkit.event.entity.ItemSpawnEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
-import cn.nukkit.math.NukkitMath;
+import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.AddItemEntityPacket;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.EntityEventPacket;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
  * @author MagicDroidX
@@ -24,12 +29,21 @@ import cn.nukkit.network.protocol.EntityEventPacket;
 public class EntityItem extends Entity {
 
     public static final int NETWORK_ID = 64;
+    @Getter
+    @Setter
     protected String owner;
+    @Setter
+    @Getter
     protected String thrower;
+    @Getter
     protected Item item;
+    @Getter
+    @Setter
     protected int pickupDelay;
+    private boolean mergeItems;
     protected boolean floatsInLava;
     public Player droppedBy;
+    private int waterTicks;
 
     private boolean deadOnceAndForAll;
 
@@ -107,6 +121,10 @@ public class EntityItem extends Entity {
             this.thrower = this.namedTag.getString("Thrower");
         }
 
+        if(this.namedTag.contains("Mergeable")) {
+            this.mergeItems = this.namedTag.getBoolean("Mergeable");
+        } else mergeItems = true;
+
         if (!this.namedTag.contains("Item")) {
             this.close();
             return;
@@ -127,6 +145,10 @@ public class EntityItem extends Entity {
         }
 
         this.server.getPluginManager().callEvent(new ItemSpawnEvent(this));
+    }
+
+    public boolean isLavaResistant() {
+        return this.fireProof;
     }
 
     @Override
@@ -171,19 +193,45 @@ public class EntityItem extends Entity {
         if (tickDiff <= 0 && !this.justCreated) {
             return true;
         }
+        this.lastUpdate = currentTick;
 
-        this.minimalEntityTick(currentTick, tickDiff);
-
-        if (this.age > 6000) {
-            ItemDespawnEvent ev = new ItemDespawnEvent(this);
-            this.server.getPluginManager().callEvent(ev);
-
-            if (ev.isCancelled()) {
-                this.age = 0;
-            } else {
-                this.close();
-                return false;
+        if (this.mergeItems && this.age % 60 == 0 && this.onGround && this.getItem() != null && this.isAlive()) {
+            if (this.getItem().getCount() < this.getItem().getMaxStackSize()) {
+                for (Entity entity : this.getLevel().getNearbyEntities(getBoundingBox().grow(1, 1, 1), this, false)) {
+                    if (entity instanceof EntityItem) {
+                        if (!entity.isAlive()) {
+                            continue;
+                        }
+                        if (!((EntityItem) entity).mergeItems) continue;
+                        Item closeItem = ((EntityItem) entity).getItem();
+                        if (!closeItem.equals(getItem(), true, true)) {
+                            continue;
+                        }
+                        if (!entity.isOnGround()) {
+                            continue;
+                        }
+                        int newAmount = this.getItem().getCount() + closeItem.getCount();
+                        if (newAmount > this.getItem().getMaxStackSize()) {
+                            continue;
+                        }
+                        entity.close();
+                        this.getItem().setCount(newAmount);
+                        EntityEventPacket packet = new EntityEventPacket();
+                        packet.eid = getId();
+                        packet.data = newAmount;
+                        packet.event = EntityEventPacket.MERGE_ITEMS;
+                        Server.broadcastPacket(this.getViewers().values(), packet);
+                    }
+                }
             }
+        }
+
+        boolean hasUpdate = this.entityBaseTick(tickDiff);
+
+        boolean lavaResistant = fireProof || item != null && this.isLavaResistant();
+
+        if (!lavaResistant && (isInsideOfFire() || isInsideOfLava())) {
+            this.kill();
         }
 
         if (this.isAlive()) {
@@ -194,115 +242,162 @@ public class EntityItem extends Entity {
                 }
             }
 
-            // updateMode % 3 or age % 20 basically means on every reduced update, don't use updateMode % 2 because that would include every update with default updateMode
-            if (this.onGround && this.item != null && (this.updateMode % 3 == 1 || this.age % 20 == 0)) {
-                if (this.item.getCount() < this.item.getMaxStackSize()) {
-                    Entity[] e = this.getLevel().getNearbyEntities(getBoundingBox().grow(1, 1, 1), this);
+            int bid = this.level.getBlockIdAt((int) this.x, (int) this.boundingBox.getMaxY(), (int) this.z, BlockLayer.NORMAL);
 
-                    for (Entity entity : e) {
-                        if (entity instanceof EntityItem) {
-                            if (entity.closed || !entity.isAlive() || !entity.isOnGround()) {
-                                continue;
-                            }
-                            Item closeItem = ((EntityItem) entity).getItem();
-                            if (!closeItem.equals(item, true, true)) {
-                                continue;
-                            }
-                            int newAmount = this.item.getCount() + closeItem.getCount();
-                            if (newAmount > this.item.getMaxStackSize()) {
-                                continue;
-                            }
-                            closeItem.setCount(0);
-                            entity.close();
-                            this.item.setCount(newAmount);
-                            EntityEventPacket packet = new EntityEventPacket();
-                            packet.eid = getId();
-                            packet.data = newAmount;
-                            packet.event = EntityEventPacket.MERGE_ITEMS;
-                            Server.broadcastPacket(this.getViewers().values(), packet);
-                        }
-                        if (this.item.getCount() >= this.item.getMaxStackSize()) {
-                            break;
-                        }
-                    }
-                }
-            }
+            boolean inWaterBlock =
+                    bid == BlockID.STILL_WATER || bid == BlockID.WATER
+                            || (this.level.getBlockIdAt((int) this.x, (int) this.boundingBox.getMaxY(), (int) this.z, BlockLayer.WATERLOGGED) == BlockID.STILL_WATER
+                            || this.level.getBlockIdAt((int) this.x, (int) this.boundingBox.getMaxY(), (int) this.z, BlockLayer.WATERLOGGED) == BlockID.WATER);
 
-            int blockId;
-            if (this.isOnGround()) {
-                this.motionY = 0;
-            } else if (Block.isWater((blockId = level.getBlockIdAt(this.chunk, this.getFloorX(), NukkitMath.floorDouble(this.y + 0.53), this.getFloorZ()))) ||
-                    (this.floatsInLava && (blockId == Block.LAVA || blockId == Block.STILL_LAVA))) {
-                this.motionY = this.getGravity() / 2;
+            boolean inLavaBlock =
+                    this.level.getBlockIdAt((int) this.x, (int) this.boundingBox.getMaxY(), (int) this.z, BlockLayer.NORMAL) == BlockID.STILL_LAVA
+                            || this.level.getBlockIdAt((int) this.x, (int) this.boundingBox.getMaxY(), (int) this.z, BlockLayer.NORMAL) == BlockID.LAVA
+                            || this.level.getBlockIdAt((int) this.x, (int) this.boundingBox.getMaxY(), (int) this.z, BlockLayer.WATERLOGGED) == BlockID.STILL_LAVA
+                            || this.level.getBlockIdAt((int) this.x, (int) this.boundingBox.getMaxY(), (int) this.z, BlockLayer.WATERLOGGED) == BlockID.LAVA;
+
+            boolean inLiquid = inWaterBlock || (lavaResistant && inLavaBlock);
+
+            if (inLiquid) {
+                this.motionY = this.getGravity() - 0.06;
+                applyLiquidFlow();
+            } else if (this.isInsideOfWater() || (lavaResistant && this.isInsideOfLava())) {
+                this.motionY = this.getGravity() - 0.06;
             } else {
                 this.motionY -= this.getGravity();
             }
 
-            this.checkBlockCollision();
+            if (this.checkObstruction(this.x, this.y, this.z)) {
+                hasUpdate = true;
+            }
 
-            this.checkObstruction(this.x, this.y, this.z);
+            this.move(this.motionX, this.motionY, this.motionZ);
 
-            // Check nearby blocks changed
-            if (this.updateMode % 3 == 1) {
-                this.updateMode = 5;
+            if (!inLiquid) {
+                double friction = 1 - this.getDrag();
+                if (this.onGround && (Math.abs(this.motionX) > 0.00001 || Math.abs(this.motionZ) > 0.00001)) {
+                    friction *= this.getLevel().getBlock(this.temporalVector.setComponents(
+                            (int) Math.floor(this.x), (int) Math.floor(this.y - 1), (int) Math.floor(this.z)
+                    )).getFrictionFactor();
+                }
+                this.motionX *= friction;
+                this.motionY *= 1 - this.getDrag();
+                this.motionZ *= friction;
 
-                // Force check for nearby blocks changed even if not moving
-                if (this.motionY == 0) {
-                    this.motionY = 0.00001;
+                if (this.onGround) {
+                    this.motionY *= -0.5;
                 }
             }
 
-            // Flowing water
-            if (this.move(this.motionX, this.motionY, this.motionZ) && !(this.motionX == 0 && this.motionZ == 0)) {
-                this.collisionBlocks = null;
-            }
-
-            if (this.y < (this.getLevel().getMinBlockY() - 16)) {
-                this.attack(new EntityDamageEvent(this, DamageCause.VOID, 10));
-            }
-
-            if (this.fireTicks > 0) {
-                if (this.fireProof) {
-                    this.fireTicks -= tickDiff << 2;
-                    if (this.fireTicks < 0) {
-                        this.fireTicks = 0;
-                    }
-                } else {
-                    if (((this.fireTicks % 20) == 0 || tickDiff > 20)) {
-                        this.attack(new EntityDamageEvent(this, DamageCause.FIRE_TICK, 1));
-                    }
-                    this.fireTicks -= tickDiff;
-                }
-                if (this.fireTicks <= 0) {
-                    this.extinguish();
-                } else if (!this.fireProof) {
-                    this.setDataFlag(DATA_FLAGS, DATA_FLAG_ONFIRE, true);
-                }
-            }
-
-            double friction = 1 - this.getDrag();
-            if (this.onGround && (Math.abs(this.motionX) > 0.00001 || Math.abs(this.motionZ) > 0.00001)) {
-                friction *= this.getLevel().getBlock(this.chunk, getFloorX(), getFloorY() - 1, getFloorZ(), false).getFrictionFactor();
-            }
-
-            this.motionX *= friction;
-            this.motionY *= 1 - this.getDrag();
-            this.motionZ *= friction;
-
-            if (this.onGround) {
-                this.motionY = 0;
+            if (inWaterBlock) {
+                if (this.waterTicks < 1000) this.waterTicks++;
+            } else {
+                this.waterTicks = 0;
             }
 
             this.updateMovement();
+
+            if (this.age > 6000) {
+                ItemDespawnEvent ev = new ItemDespawnEvent(this);
+                this.server.getPluginManager().callEvent(ev);
+                if (ev.isCancelled()) {
+                    this.age = 0;
+                    respawnToAll();
+                } else {
+                    this.kill();
+                    hasUpdate = true;
+                }
+            }
         }
 
-        if (!this.isAlive()) {
-            this.close();
-            return false;
-        }
-
-        return !(this.motionX == 0 && this.motionY == 0 && this.motionZ == 0);
+        return hasUpdate || !this.onGround
+                || Math.abs(this.motionX) > 0.00001
+                || Math.abs(this.motionY) > 0.00001
+                || Math.abs(this.motionZ) > 0.00001;
     }
+
+    private void applyLiquidFlow() {
+        Block liquidBlock = this.level.getBlock((int) this.x, (int) Math.floor(this.y), (int) this.z);
+        if (!(liquidBlock instanceof BlockLiquid)) {
+            return;
+        }
+
+        Vector3 flow = ((BlockLiquid) liquidBlock).getFlowVector();
+        double len = Math.sqrt(flow.x * flow.x + flow.z * flow.z);
+        if (len > 0) {
+            flow = new Vector3(flow.x / len, 0, flow.z / len);
+        }
+
+        double accelWater = 0.0015;
+        double accelIce = 0.041;
+        double capWaterXZ = 0.035;
+        double capIceXZ = 0.22;
+        double dragXZ = 0.92;
+        double dragY = 0.90;
+
+        Block under = this.level.getBlock((int) this.x, (int) Math.floor(this.y) - 1, (int) this.z);
+        boolean overIce = under.getId() == BlockID.ICE
+                || under.getId() == BlockID.FROSTED_ICE
+                || under.getId() == BlockID.PACKED_ICE
+                || under.getId() == BlockID.BLUE_ICE;
+
+        double accel = overIce ? accelIce : accelWater;
+        this.motionX += flow.x * accel;
+        this.motionZ += flow.z * accel;
+
+        this.motionY -= this.getGravity() * 0.20;
+        int surfaceY = (int) Math.floor(this.boundingBox.getMaxY());
+        int scanY = surfaceY;
+        for (int i = 0; i < 3; i++) {
+            int idUp = this.level.getBlockIdAt((int) this.x, scanY + 1, (int) this.z, BlockLayer.NORMAL);
+            int idUpWL = this.level.getBlockIdAt((int) this.x, scanY + 1, (int) this.z, BlockLayer.WATERLOGGED);
+            boolean isWaterUp = idUp == BlockID.STILL_WATER || idUp == BlockID.WATER
+                    || idUpWL == BlockID.STILL_WATER || idUpWL == BlockID.WATER;
+            if (!isWaterUp) {
+                surfaceY = scanY + 1;
+                break;
+            }
+            scanY++;
+        }
+
+        double topY = this.boundingBox.getMaxY();
+        double depth = surfaceY - topY;
+        double targetDepth = 0.35;
+        double hysteresis = 0.10;
+        double k = 0.20;
+        double buoyBase = 0.010;
+        double buoyMaxExtra = 0.030;
+
+        if (this.waterTicks < 15) {
+            this.motionY -= 0.005;
+        }
+
+        double force = k * (depth - targetDepth);
+        if (depth > targetDepth + hysteresis) {
+            double buoyancy = buoyBase + Math.min((depth - targetDepth) * 0.06, buoyMaxExtra);
+            this.motionY += force + buoyancy;
+            this.motionY *= 0.92;
+        } else if (depth < targetDepth - hysteresis) {
+            this.motionY += force - 0.006;
+            this.motionY *= 0.92;
+        } else {
+            this.motionY += force * 0.5 + buoyBase * 0.5;
+            this.motionY *= 0.94;
+        }
+
+        this.motionX *= dragXZ;
+        this.motionZ *= dragXZ;
+        this.motionY *= dragY;
+
+        double capXZ = overIce ? capIceXZ : capWaterXZ;
+        if (this.motionX > capXZ) this.motionX = capXZ;
+        if (this.motionX < -capXZ) this.motionX = -capXZ;
+        if (this.motionZ > capXZ) this.motionZ = capXZ;
+        if (this.motionZ < -capXZ) this.motionZ = -capXZ;
+
+        if (this.motionY > 0.06) this.motionY = 0.06;
+        if (this.motionY < -0.08) this.motionY = -0.08;
+    }
+
 
     @Override
     public void saveNBT() {
@@ -327,37 +422,9 @@ public class EntityItem extends Entity {
         return this.hasCustomName() ? this.getNameTag() : (this.item.hasCustomName() ? this.item.getCustomName() : this.item.getName());
     }
 
-    public Item getItem() {
-        return item;
-    }
-
     @Override
     public boolean canCollideWith(Entity entity) {
         return false;
-    }
-
-    public int getPickupDelay() {
-        return pickupDelay;
-    }
-
-    public void setPickupDelay(int pickupDelay) {
-        this.pickupDelay = pickupDelay;
-    }
-
-    public String getOwner() {
-        return owner;
-    }
-
-    public void setOwner(String owner) {
-        this.owner = owner;
-    }
-
-    public String getThrower() {
-        return thrower;
-    }
-
-    public void setThrower(String thrower) {
-        this.thrower = thrower;
     }
 
     @Override

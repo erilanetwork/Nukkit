@@ -5,6 +5,7 @@ import cn.nukkit.block.Block;
 import cn.nukkit.event.Cancellable;
 import cn.nukkit.event.HandlerList;
 import cn.nukkit.item.Item;
+import lombok.Setter;
 
 /**
  * Event for a block being placed.
@@ -25,6 +26,9 @@ public class BlockPlaceEvent extends BlockEvent implements Cancellable {
     protected final Block blockReplace;
     protected final Block blockAgainst;
 
+    @Setter
+    private boolean placed;
+
     /**
      * This event is called when a block is placed.
      * @param player Player who placed block.
@@ -33,12 +37,17 @@ public class BlockPlaceEvent extends BlockEvent implements Cancellable {
      * @param blockAgainst Block against.
      * @param item Item that was placed.
      */
-    public BlockPlaceEvent(Player player, Block blockPlace, Block blockReplace, Block blockAgainst, Item item) {
+    public BlockPlaceEvent(Player player, Block blockPlace, Block blockReplace, Block blockAgainst, Item item, boolean placed) {
         super(blockPlace);
         this.blockReplace = blockReplace;
         this.blockAgainst = blockAgainst;
         this.item = item;
         this.player = player;
+        this.placed = placed;
+    }
+
+    public boolean wasPlaced() {
+        return placed;
     }
 
     public Player getPlayer() {

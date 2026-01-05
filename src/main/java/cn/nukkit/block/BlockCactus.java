@@ -87,43 +87,90 @@ public class BlockCactus extends BlockTransparentMeta {
     public int onUpdate(int type) {
         Block down = this.down();
         boolean isRoot = (down.getId() != CACTUS);
+
         if (type == Level.BLOCK_UPDATE_NORMAL) {
             boolean invalidDown = down.getId() != SAND && down.getId() != CACTUS;
             boolean invalidSide = false;
+
             for (BlockFace side : BlockFace.Plane.HORIZONTAL) {
                 if (!getSide(side).canBeFlowedInto()) {
                     invalidSide = true;
                     break;
                 }
             }
+
             if (invalidDown || invalidSide) {
-                BlockPhysicsBreakEvent event = new BlockPhysicsBreakEvent(this, type, isRoot);
-                Server.getInstance().getPluginManager().callEvent(event);
-                if (!event.isCancelled()) {
-                    this.getLevel().useBreakOn(this);
+                boolean rootBreak = (down.getId() != CACTUS);
+
+                if (rootBreak) {
+                    BlockPhysicsBreakEvent event = new BlockPhysicsBreakEvent(this, type, true);
+                    Server.getInstance().getPluginManager().callEvent(event);
+                    if (event.isCancelled()) {
+                        return Level.BLOCK_UPDATE_NORMAL;
+                    }
                 }
+
+                int yAbove = 0;
+                while (true) {
+                    Block target = this.getLevel().getBlock((int) this.x, (int) this.y + yAbove, (int) this.z);
+                    if (target.getId() == CACTUS) {
+                        this.getLevel().dropItem(
+                                target.add(0.5, 0.5, 0.5),
+                                Item.get(Block.CACTUS, 0, 1)
+                        );
+                        this.getLevel().setBlock((int) this.x, (int) this.y + yAbove, (int) this.z, BlockLayer.NORMAL, Block.get(AIR), false, false, true);
+                        yAbove++;
+                    } else {
+                        break;
+                    }
+                }
+
                 return Level.BLOCK_UPDATE_NORMAL;
             }
         } else if (type == Level.BLOCK_UPDATE_RANDOM) {
-            if (isRoot || down.getId() == CACTUS) {
+            if (down.getId() == SAND || down.getId() == CACTUS) {
                 if (this.getDamage() == 0x0F) {
-                    FullChunk chunk = this.level.getChunk((int) x >> 4, (int) z >> 4);
-                    for (int y = 1; y < 3; ++y) {
-                        Block b = this.getLevel().getBlock(chunk, (int) this.x, (int) this.y + y, (int) this.z, true);
-                        if (b.getId() == AIR) {
-                            BlockGrowEvent event = new BlockGrowEvent(b, Block.get(CACTUS));
-                            Server.getInstance().getPluginManager().callEvent(event);
-                            if (!event.isCancelled()) {
-                                this.getLevel().setBlock(b, event.getNewState(), true, true);
-                            }
+                    int height = 1;
+
+                    int yDown = (int) this.y - 1;
+                    while (true) {
+                        Block below = this.getLevel().getBlock((int) this.x, yDown, (int) this.z);
+                        if (below.getId() == CACTUS) {
+                            height++;
+                            yDown--;
+                        } else {
                             break;
                         }
                     }
+                    int yUp = (int) this.y + 1;
+                    while (true) {
+                        Block above = this.getLevel().getBlock((int) this.x, yUp, (int) this.z);
+                        if (above.getId() == CACTUS) {
+                            height++;
+                            yUp++;
+                        } else {
+                            break;
+                        }
+                    }
+
+                    if (height < 3) {
+                        Block growPos = this.getLevel().getBlock((int) this.x, yUp, (int) this.z);
+                        if (growPos.getId() == AIR) {
+                            BlockGrowEvent event = new BlockGrowEvent(growPos, Block.get(CACTUS));
+                            Server.getInstance().getPluginManager().callEvent(event);
+                            if (!event.isCancelled()) {
+                                this.getLevel().setBlock(growPos, event.getNewState(), true, true);
+                            }
+                        }
+                    }
+
                     this.setDamage(0);
                 } else {
                     this.setDamage(this.getDamage() + 1);
                 }
-                this.level.setBlock((int) this.x, (int) this.y, (int) this.z, BlockLayer.NORMAL, this, false, true, false);
+
+                this.level.setBlock((int) this.x, (int) this.y, (int) this.z,
+                        BlockLayer.NORMAL, this, false, true, false);
             }
         }
 

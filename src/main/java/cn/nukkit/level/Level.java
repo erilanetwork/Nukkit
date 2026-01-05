@@ -67,6 +67,7 @@ import javax.annotation.Nullable;
 import java.lang.ref.SoftReference;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.locks.StampedLock;
 
 
 /**
@@ -2327,40 +2328,7 @@ public class Level implements ChunkManager, Metadatable, GeneratorTaskFactory {
             }
 
             if (player != null && hand.getBoundingBox().intersectsWith(player.getNextPositionBB())) {
-                this.sendBlocks(player, new Block[]{block, target}, UpdateBlockPacket.FLAG_NONE); // Prevent ghost blocks
-                return null; // Entity in block
-            }
-        }
-
-        BlockPlaceEvent placeEvent = null;
-
-        if (player != null) {
-            placeEvent = new BlockPlaceEvent(player, hand, block, target, item);
-            if (player.getGamemode() == Player.ADVENTURE) {
-                Tag tag = item.getNamedTagEntry("CanPlaceOn");
-                boolean canPlace = false;
-                if (tag instanceof ListTag) {
-                    //noinspection unchecked
-                    for (Tag v : ((ListTag<Tag>) tag).getAll()) {
-                        if (v instanceof StringTag) {
-                            Item entry = Item.fromString(((StringTag) v).data);
-                            if (entry.getId() != 0 && entry.getBlockUnsafe() != null && entry.getBlockUnsafe().getId() == target.getId()) {
-                                canPlace = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-                if (!canPlace) {
-                    placeEvent.setCancelled(true);
-                }
-            }
-
-            if (!player.isOp() && isInSpawnRadius(target)) {
-                placeEvent.setCancelled(true);
-            }
-
-            if (placeEvent.isCancelled()) {
+                this.sendBlocks(player, new Block[]{block, target}, UpdateBlockPacket.FLAG_NONE);
                 return null;
             }
         }
@@ -2374,21 +2342,33 @@ public class Level implements ChunkManager, Metadatable, GeneratorTaskFactory {
             }
         }
 
-        boolean canPhysicallyPlace = hand.place(item, block, target, face, fx, fy, fz, player);
+        BlockPlaceEvent preEvent;
 
         if (player != null) {
-            if (!canPhysicallyPlace) {
-                placeEvent.setCancelled(true);
-                ev.setCancelled(true);
-            }
+            preEvent = new BlockPlaceEvent(player, hand, block, target, item, false);
+            this.server.getPluginManager().callEvent(preEvent);
 
-            this.server.getPluginManager().callEvent(placeEvent);
-            this.server.getPluginManager().callEvent(ev);
-
-            if (placeEvent.isCancelled() || ev.isCancelled()) {
+            if (preEvent.isCancelled()) {
                 return null;
             }
         }
+
+        boolean canPhysicallyPlace = hand.place(item, block, target, face, fx, fy, fz, player);
+
+        if (!canPhysicallyPlace) {
+            return null;
+        }
+
+        if (player != null) {
+            BlockPlaceEvent placeEvent = new BlockPlaceEvent(player, hand, block, target, item, true);
+            this.server.getPluginManager().callEvent(placeEvent);
+
+            if (placeEvent.isCancelled()) {
+                this.setBlock(block, Block.LAYER_NORMAL, Block.get(BlockID.AIR), true, true);
+                return null;
+            }
+        }
+
 
         if (item.hasPersistentDataContainer() && item.getPersistentDataContainer().convertsToBlock()) {
             block.getPersistentDataContainer().setStorage(item.getPersistentDataContainer().getStorage().clone());
@@ -3335,9 +3315,17 @@ public class Level implements ChunkManager, Metadatable, GeneratorTaskFactory {
     }
 
     public boolean isSpawnChunk(int X, int Z) {
-        Vector3 cachedSpawnPos = this.provider.getSpawn();
+        if (this.provider == null) {
+            return false;
+        }
 
-        return Math.abs(X - (cachedSpawnPos.getChunkX())) <= 1 && Math.abs(Z - (cachedSpawnPos.getChunkZ())) <= 1;
+        Vector3 cachedSpawnPos = this.provider.getSpawn();
+        if (cachedSpawnPos == null) {
+            return false;
+        }
+
+        return Math.abs(X - cachedSpawnPos.getChunkX()) <= 1
+                && Math.abs(Z - cachedSpawnPos.getChunkZ()) <= 1;
     }
 
     public Position getSafeSpawn() {

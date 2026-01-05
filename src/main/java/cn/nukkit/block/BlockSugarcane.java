@@ -92,16 +92,33 @@ public class BlockSugarcane extends BlockFlowable {
     @Override
     public int onUpdate(int type) {
         Block down = this.down();
-
         boolean isRoot = (down.getId() != SUGARCANE_BLOCK);
-
         if (type == Level.BLOCK_UPDATE_NORMAL) {
-            if (down.isTransparent() && isRoot) {
-                BlockPhysicsBreakEvent event = new BlockPhysicsBreakEvent(this, type, isRoot);
+            if (isRoot && down.isTransparent()) {
+                BlockPhysicsBreakEvent event = new BlockPhysicsBreakEvent(this, type, true);
                 Server.getInstance().getPluginManager().callEvent(event);
+                if (event.isCancelled()) {
+                    return Level.BLOCK_UPDATE_NORMAL;
+                }
 
-                if (!event.isCancelled()) {
-                    this.getLevel().useBreakOn(this);
+                int yAbove = 0;
+                while (true) {
+                    Block target = this.getLevel().getBlock((int) this.x, (int) this.y + yAbove, (int) this.z);
+                    if (target.getId() == SUGARCANE_BLOCK) {
+                        this.getLevel().dropItem(
+                                target.add(0.5, 0.5, 0.5),
+                                Item.get(Item.SUGARCANE, 0, 1)
+                        );
+                        this.getLevel().setBlock(
+                                (int) this.x, (int) this.y + yAbove, (int) this.z,
+                                BlockLayer.NORMAL,
+                                Block.get(AIR),
+                                false, false, false
+                        );
+                        yAbove++;
+                    } else {
+                        break;
+                    }
                 }
                 return Level.BLOCK_UPDATE_NORMAL;
             }
@@ -111,11 +128,10 @@ public class BlockSugarcane extends BlockFlowable {
                     for (int y = 1; y < 3; ++y) {
                         Block b = this.getLevel().getBlock((int) this.x, (int) this.y + y, (int) this.z);
                         if (b.getId() == AIR) {
-                            BlockGrowEvent ev = new BlockGrowEvent(b, Block.get(BlockID.SUGARCANE_BLOCK));
+                            BlockGrowEvent ev = new BlockGrowEvent(b, Block.get(SUGARCANE_BLOCK));
                             Server.getInstance().getPluginManager().callEvent(ev);
-
                             if (!ev.isCancelled()) {
-                                this.getLevel().setBlock(b, ev.getNewState(), false);
+                                this.getLevel().setBlock(b, ev.getNewState(), true, true);
                             }
                             break;
                         }
@@ -124,7 +140,8 @@ public class BlockSugarcane extends BlockFlowable {
                 } else {
                     this.setDamage(this.getDamage() + 1);
                 }
-                this.level.setBlock((int) this.x, (int) this.y, (int) this.z, BlockLayer.NORMAL, this, false, true, false);
+                this.level.setBlock((int) this.x, (int) this.y, (int) this.z,
+                        BlockLayer.NORMAL, this, false, true, false);
                 return Level.BLOCK_UPDATE_RANDOM;
             }
         }

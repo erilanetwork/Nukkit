@@ -13,6 +13,8 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.BlockColor;
 
 import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * @author Angelic47
@@ -195,7 +197,7 @@ public class BlockRedstoneWire extends BlockFlowable {
         }
 
         if (type == Level.BLOCK_UPDATE_NORMAL && !canStayOnFullSolid(this.down())) {
-            BlockPhysicsBreakEvent event = new BlockPhysicsBreakEvent(this, type, false);
+            BlockPhysicsBreakEvent event = new BlockPhysicsBreakEvent(this, type, true);
             Server.getInstance().getPluginManager().callEvent(event);
             if (!event.isCancelled()) {
                 this.getLevel().useBreakOn(this);
