@@ -2534,6 +2534,10 @@ public class Level implements ChunkManager, Metadatable, GeneratorTaskFactory {
     }
 
     public Map<Long, Entity> getChunkEntities(int X, int Z, boolean loadChunks) {
+        if (this.provider == null) {
+            return Collections.emptyMap();
+        }
+
         FullChunk chunk = loadChunks ? this.getChunk(X, Z) : this.getChunkIfLoaded(X, Z);
         return chunk != null ? chunk.getEntities() : Collections.emptyMap();
     }
@@ -2771,16 +2775,27 @@ public class Level implements ChunkManager, Metadatable, GeneratorTaskFactory {
     }
 
     public BaseFullChunk getChunk(int chunkX, int chunkZ, boolean create) {
+        if (this.provider == null) {
+            return null;
+        }
+
         long index = Level.chunkHash(chunkX, chunkZ);
         BaseFullChunk chunk = this.provider.getLoadedChunk(index);
-        if (chunk == null) {
-            chunk = this.forceLoadChunk(index, chunkX, chunkZ, create);
+
+        if (chunk == null && create) {
+            chunk = this.forceLoadChunk(index, chunkX, chunkZ, true);
         }
+
         return chunk;
     }
 
+
     @Nullable
     public BaseFullChunk getChunkIfLoaded(int chunkX, int chunkZ) {
+        if (this.provider == null) {
+            return null;
+        }
+
         return this.provider.getLoadedChunk(Level.chunkHash(chunkX, chunkZ));
     }
 
@@ -3627,6 +3642,10 @@ public class Level implements ChunkManager, Metadatable, GeneratorTaskFactory {
     }
 
     public void unloadChunks(int maxUnload, boolean force) {
+        if (this.provider == null) {
+            return;
+        }
+
         if (server.holdWorldSave && !force && this.saveOnUnloadEnabled) {
             return;
         }
@@ -3680,6 +3699,10 @@ public class Level implements ChunkManager, Metadatable, GeneratorTaskFactory {
      * @return true if there is allocated time remaining
      */
     private boolean unloadChunks(long now, long allocatedTime, boolean force) {
+        if (this.provider == null) {
+            return true;
+        }
+
         if (server.holdWorldSave && !force && this.saveOnUnloadEnabled) {
             return false;
         }

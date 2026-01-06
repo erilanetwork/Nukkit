@@ -79,6 +79,11 @@ public class ItemBlock extends Item {
     }
 
     @Override
+    final public String getOriginalName() {
+        return this.block.getName();
+    }
+
+    @Override
     final public String toString() {
         String out = "ItemBlock " + this.block.getName() + " (" + this.id + ':' + (!this.hasMeta ? "?" : this.meta) + ")x" + this.count;
         CompoundTag tag;

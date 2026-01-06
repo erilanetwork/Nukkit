@@ -1115,6 +1115,10 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         return this.hasCustomName() ? this.getCustomName() : this.name;
     }
 
+    public String getOriginalName() {
+        return this.name;
+    }
+
     final public boolean canBePlaced() {
         return ((this.block != null) && this.block.canBePlaced());
     }
