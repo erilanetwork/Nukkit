@@ -1307,6 +1307,10 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         return false;
     }
 
+    public double getKnockbackResistance() {
+        return 0.0;
+    }
+
     /**
      * Called when a player uses the item on air, for example throwing a projectile.
      * Returns whether the item was changed, for example count decrease or durability change.

@@ -121,6 +121,14 @@ abstract public class ItemArmor extends Item implements ItemDurable {
     }
 
     @Override
+    public double getKnockbackResistance() {
+        if (this.getTier() == TIER_NETHERITE) {
+            return 0.05;
+        }
+        return 0.0;
+    }
+
+    @Override
     public boolean canBePutInHelmetSlot() {
         return this.isHelmet();
     }

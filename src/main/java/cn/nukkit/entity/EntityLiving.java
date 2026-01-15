@@ -209,7 +209,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     }
 
     public void knockBack(Entity attacker, double damage, double x, double z) {
-        this.knockBack(attacker, damage, x, z, 0.3);
+        this.knockBack(attacker, damage, x, z, 0.4);
     }
 
     public void knockBack(Entity attacker, double damage, double x, double z, double base) {
@@ -219,15 +219,13 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         }
 
         if (this instanceof Player) {
-            int netheritePieces = 0;
+            double totalReduction = 0.0;
             for (Item armor : ((Player) this).getInventory().getArmorContents()) {
-                if (armor.getTier() == ItemArmor.TIER_NETHERITE) {
-                    netheritePieces++;
+                if (armor != null) {
+                    totalReduction += armor.getKnockbackResistance();
                 }
             }
-            if (netheritePieces > 0) {
-                base *= 1 - 0.1 * netheritePieces;
-            }
+            base *= (1.0 - totalReduction);
         }
 
         f = 1 / f;
