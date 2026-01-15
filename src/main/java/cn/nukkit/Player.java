@@ -5110,6 +5110,20 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         for (String msg : message.split("\n")) {
             if (!msg.trim().isEmpty() && msg.length() < 512) {
+                // Mention system
+                if (msg.contains("@")) {
+                    for (Player onlinePlayer : this.server.getOnlinePlayers().values()) {
+                        if (msg.toLowerCase().contains("@" + onlinePlayer.getName().toLowerCase())) {
+                            PlayerMentionEvent mentionEvent = new PlayerMentionEvent(this, onlinePlayer, msg);
+                            this.server.getPluginManager().callEvent(mentionEvent);
+                            if (mentionEvent.isCancelled()) {
+                                return false;
+                            }
+                            msg = mentionEvent.getMessage();
+                        }
+                    }
+                }
+
                 PlayerChatEvent chatEvent = new PlayerChatEvent(this, msg);
                 this.server.getPluginManager().callEvent(chatEvent);
                 if (!chatEvent.isCancelled()) {
