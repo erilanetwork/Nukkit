@@ -5110,6 +5110,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         for (String msg : message.split("\n")) {
             if (!msg.trim().isEmpty() && msg.length() < 512) {
+                // Disable mentions by removing '@'
+                msg = msg.replace("@", "");
+
                 PlayerChatEvent chatEvent = new PlayerChatEvent(this, msg);
                 this.server.getPluginManager().callEvent(chatEvent);
                 if (!chatEvent.isCancelled()) {
